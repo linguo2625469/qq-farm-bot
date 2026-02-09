@@ -7,7 +7,7 @@ const { CONFIG, PlantPhase, PHASE_NAMES } = require('./config');
 const { types } = require('./proto');
 const { sendMsgAsync, getUserState, networkEvents } = require('./network');
 const { toLong, toNum, getServerTimeSec, toTimeSec, log, logWarn, sleep } = require('./utils');
-const { getPlantNameBySeedId, getPlantName, getPlantExp, formatGrowTime, getPlantGrowTime } = require('./gameConfig');
+const { getPlantNameBySeedId, getPlantName, getPlantExp, formatGrowTime, getPlantGrowTime, getPlantBySeedId } = require('./gameConfig');
 
 // ============ 内部状态 ============
 let isCheckingFarm = false;
@@ -77,6 +77,7 @@ async function insecticide(landIds) {
 
 // 普通肥料 ID
 const NORMAL_FERTILIZER_ID = 1011;
+const FERTILIZER_SPEED_SECONDS = 1080;  // 普通肥料加速1080秒（18分钟）
 
 /**
  * 施肥 - 必须逐块进行，服务器不支持批量
@@ -194,12 +195,19 @@ async function findBestSeed() {
         const boughtNum = toNum(goods.bought_num);
         if (limitCount > 0 && boughtNum >= limitCount) continue;
 
+        const seedId = toNum(goods.item_id);
+        const plantInfo = getPlantBySeedId(seedId);
+        const exp = plantInfo ? plantInfo.exp : 0;
+        const growTime = plantInfo ? getPlantGrowTime(plantInfo.id) : 0;
+
         available.push({
             goods,
             goodsId: toNum(goods.id),
-            seedId: toNum(goods.item_id),
+            seedId,
             price: toNum(goods.price),
             requiredLevel,
+            exp,
+            growTime,
         });
     }
 
@@ -208,10 +216,23 @@ async function findBestSeed() {
         return null;
     }
 
-    // 按等级要求排序
-    // 取最高等级种子: available.sort((a, b) => b.requiredLevel - a.requiredLevel);
-    // 暂时改为取最低等级种子 (白萝卜)
-    available.sort((a, b) => a.requiredLevel - b.requiredLevel);
+    // 最优策略：优先选择施肥后可完全加速的作物（growTime ≤ 1080s），取其中经验最高的
+    // 若无此类作物，按施肥后的经验/时间比排序
+    available.sort((a, b) => {
+        const aFullAccel = a.growTime <= FERTILIZER_SPEED_SECONDS;
+        const bFullAccel = b.growTime <= FERTILIZER_SPEED_SECONDS;
+
+        // 都可完全加速：经验高的优先
+        if (aFullAccel && bFullAccel) return b.exp - a.exp;
+        // 只有一个可完全加速：它优先
+        if (aFullAccel) return -1;
+        if (bFullAccel) return 1;
+        // 都不可完全加速：施肥后经验/时间比最高的优先
+        const ratioA = a.growTime > 0 ? a.exp / Math.max(a.growTime - FERTILIZER_SPEED_SECONDS, 1) : 0;
+        const ratioB = b.growTime > 0 ? b.exp / Math.max(b.growTime - FERTILIZER_SPEED_SECONDS, 1) : 0;
+        return ratioB - ratioA;
+    });
+
     return available[0];
 }
 
@@ -245,9 +266,11 @@ async function autoPlantEmptyLands(deadLandIds, emptyLandIds) {
     if (!bestSeed) return;
 
     const seedName = getPlantNameBySeedId(bestSeed.seedId);
-    const growTime = getPlantGrowTime(1020000 + (bestSeed.seedId - 20000));  // 转换为植物ID
-    const growTimeStr = growTime > 0 ? ` 生长${formatGrowTime(growTime)}` : '';
-    log('商店', `最佳种子: ${seedName} (${bestSeed.seedId}) 价格=${bestSeed.price}金币${growTimeStr}`);
+    const growTimeStr = bestSeed.growTime > 0 ? ` 生长${formatGrowTime(bestSeed.growTime)}` : '';
+    const fertInfo = bestSeed.growTime <= FERTILIZER_SPEED_SECONDS
+        ? ' (施肥后瞬熟)'
+        : ` (施肥后${formatGrowTime(Math.max(bestSeed.growTime - FERTILIZER_SPEED_SECONDS, 1))})`;
+    log('商店', `最佳种子: ${seedName} (${bestSeed.seedId}) 经验=${bestSeed.exp} 价格=${bestSeed.price}金币${growTimeStr}${fertInfo}`);
 
     // 3. 购买
     const needCount = landsToPlant.length;

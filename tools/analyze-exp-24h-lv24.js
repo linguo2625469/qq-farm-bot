@@ -1,24 +1,44 @@
 /**
- * 24级玩家24小时最大经验分析
+ * 24小时最大经验分析
  * 
- * 可购买种子：白萝卜 ~ 豌豆 (seed_id: 20001 ~ 20008)
+ * 用法: node analyze-exp-24h-lv24.js [--lv 等级] [--land 土地数]
+ * 示例: node analyze-exp-24h-lv24.js --lv 9 --land 9
+ * 
+ * lv等级数 = 可种植的植物种类数（Plant.json从上往下数）
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// 配置
-const FERTILIZER_SPEED_SECONDS = 30;  // 普通肥料加速30秒
-const LAND_COUNT = 15;  // 15块地
+// ==================== 配置 ====================
+const FERTILIZER_SPEED_SECONDS = 1080;  // 普通肥料加速1080秒（18分钟）
 const TIME_LIMIT_HOURS = 24;
 const TIME_LIMIT_SECONDS = TIME_LIMIT_HOURS * 3600;
-const OPERATION_TIME = 15;  // 每轮操作时间
+const OPERATION_TIME = 15;  // 每轮操作时间（秒）
 
-// 可购买的种子范围 (24级: 白萝卜到豌豆)
-const MIN_SEED_ID = 20001;
-const MAX_SEED_ID = 20008;
+// 命令行参数解析
+function parseArgs() {
+    const args = process.argv.slice(2);
+    const config = {
+        PLAYER_LEVEL: 9,   // 默认等级9（可种9种植物）
+        LAND_COUNT: 9,     // 默认9块地
+    };
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--lv' && args[i + 1]) {
+            config.PLAYER_LEVEL = parseInt(args[i + 1]);
+            i++;
+        } else if (args[i] === '--land' && args[i + 1]) {
+            config.LAND_COUNT = parseInt(args[i + 1]);
+            i++;
+        }
+    }
+    return config;
+}
 
-// 读取植物配置
+const { PLAYER_LEVEL, LAND_COUNT } = parseArgs();
+// ==================== 配置结束 ====================
+
+// 读取植物配置（Plant.json 按字典顺序排列）
 const plantPath = path.join(__dirname, '..', 'gameConfig', 'Plant.json');
 const plants = JSON.parse(fs.readFileSync(plantPath, 'utf8'));
 
@@ -48,23 +68,22 @@ function formatTime(seconds) {
     return mins > 0 ? `${hours}小时${mins}分` : `${hours}小时`;
 }
 
-// 筛选可购买的作物
-const availablePlants = plants.filter(p => {
-    const idStr = String(p.id);
-    return idStr.startsWith('102') && 
-           p.seed_id >= MIN_SEED_ID && 
-           p.seed_id <= MAX_SEED_ID;
-});
+// 按Plant.json数组顺序（字典顺序），取前 PLAYER_LEVEL 种作物
+const availablePlants = plants.slice(0, PLAYER_LEVEL);
+
+const firstName = availablePlants[0]?.name || '无';
+const lastName = availablePlants[availablePlants.length - 1]?.name || '无';
 
 console.log('=============================================');
-console.log('   24级玩家 - 24小时最大经验分析');
+console.log(`   Lv${PLAYER_LEVEL} 玩家 - 24小时最大经验分析`);
 console.log('=============================================');
 console.log('');
 console.log('配置:');
-console.log(`  - 可购买种子: 白萝卜(20001) ~ 豌豆(20008)`);
+console.log(`  - 等级: Lv${PLAYER_LEVEL}（可种 ${availablePlants.length} 种植物）`);
+console.log(`  - 可种植物: ${firstName} ~ ${lastName}`);
 console.log(`  - 土地数量: ${LAND_COUNT} 块`);
 console.log(`  - 时间限制: ${TIME_LIMIT_HOURS} 小时`);
-console.log(`  - 肥料加速: ${FERTILIZER_SPEED_SECONDS} 秒`);
+console.log(`  - 肥料加速: ${FERTILIZER_SPEED_SECONDS} 秒（${FERTILIZER_SPEED_SECONDS / 60}分钟）`);
 console.log(`  - 每轮操作: ${OPERATION_TIME} 秒`);
 console.log('');
 
@@ -75,19 +94,19 @@ for (const plant of availablePlants) {
     const growTime = parseGrowTime(plant.grow_phases);
     if (growTime <= 0) continue;
     
-    const expPerHarvest = (plant.exp || 0) + 1;  // 收获经验 + 铲除经验
+    const expPerHarvest = plant.exp || 0;  // 直接使用配置中的经验值
     
     // 不施肥
     const cycleNoFert = growTime + OPERATION_TIME;
     const cyclesNoFert = Math.floor(TIME_LIMIT_SECONDS / cycleNoFert);
     const totalExpNoFert = cyclesNoFert * expPerHarvest * LAND_COUNT;
     
-    // 施肥
+    // 施肥（每块地每轮施一次肥）
     const growTimeFert = Math.max(growTime - FERTILIZER_SPEED_SECONDS, 1);
     const cycleFert = growTimeFert + OPERATION_TIME;
     const cyclesFert = Math.floor(TIME_LIMIT_SECONDS / cycleFert);
     const totalExpFert = cyclesFert * expPerHarvest * LAND_COUNT;
-    const fertUsedHours = (cyclesFert * FERTILIZER_SPEED_SECONDS * LAND_COUNT) / 3600;
+    const fertCount = cyclesFert * LAND_COUNT;  // 总共消耗肥料数量
     
     results.push({
         seedId: plant.seed_id,
@@ -103,24 +122,21 @@ for (const plant of availablePlants) {
         cycleFert,
         cyclesFert,
         totalExpFert,
-        fertUsedHours,
+        fertCount,
     });
 }
 
-// 按施肥后24小时经验排序
-results.sort((a, b) => b.totalExpFert - a.totalExpFert);
-
-console.log('【完整作物列表 - 按24h经验排序】');
+console.log('【完整作物列表 - 按配置文件顺序】');
 console.log('');
-console.log('作物     | 成熟时间  | 单次经验 | 不施肥           | 施肥后');
-console.log('         |          |         | 周期/轮数/24h经验 | 周期/轮数/24h经验/消耗肥料');
-console.log('---------|----------|---------|------------------|-------------------------');
+console.log('作物         | 成熟时间    | 单次经验 | 不施肥               | 施肥后');
+console.log('             |            |         | 周期/轮数/24h经验     | 周期/轮数/24h经验/肥料数');
+console.log('-------------|------------|---------|----------------------|------------------------');
 
 for (const r of results) {
     console.log(
-        `${r.name.padEnd(8)} | ${formatTime(r.growTime).padEnd(8)} | ${String(r.expPerHarvest).padStart(7)} | ` +
-        `${formatTime(r.cycleNoFert).padEnd(5)}/${String(r.cyclesNoFert).padStart(4)}轮/${String(r.totalExpNoFert).padStart(5)} | ` +
-        `${formatTime(r.cycleFert).padEnd(5)}/${String(r.cyclesFert).padStart(4)}轮/${String(r.totalExpFert).padStart(5)}/${r.fertUsedHours.toFixed(0).padStart(3)}h`
+        `${r.name.padEnd(12)} | ${formatTime(r.growTime).padEnd(10)} | ${String(r.expPerHarvest).padStart(7)} | ` +
+        `${formatTime(r.cycleNoFert).padEnd(8)}/${String(r.cyclesNoFert).padStart(5)}轮/${String(r.totalExpNoFert).padStart(7)} | ` +
+        `${formatTime(r.cycleFert).padEnd(8)}/${String(r.cyclesFert).padStart(5)}轮/${String(r.totalExpFert).padStart(7)}/${String(r.fertCount).padStart(5)}个`
     );
 }
 
@@ -128,8 +144,8 @@ console.log('');
 console.log('=============================================');
 console.log('');
 
-// 最优方案
-const bestFert = results[0];
+// 最优方案（按24h总经验排序）
+const bestFert = [...results].sort((a, b) => b.totalExpFert - a.totalExpFert)[0];
 const bestNoFert = [...results].sort((a, b) => b.totalExpNoFert - a.totalExpNoFert)[0];
 
 console.log('【最优方案】');
@@ -139,7 +155,7 @@ console.log(`   成熟时间: ${formatTime(bestFert.growTime)} → 施肥后 ${f
 console.log(`   每轮周期: ${formatTime(bestFert.cycleFert)}`);
 console.log(`   24小时轮数: ${bestFert.cyclesFert} 轮`);
 console.log(`   24小时经验: ${bestFert.totalExpFert}`);
-console.log(`   消耗肥料: ${bestFert.fertUsedHours.toFixed(1)} 小时`);
+console.log(`   消耗肥料: ${bestFert.fertCount} 个`);
 console.log('');
 
 console.log(`🥈 不施肥最佳: ${bestNoFert.name}`);
@@ -159,4 +175,5 @@ console.log('【结论】');
 console.log('');
 console.log(`24小时内最快升级选择: ${bestFert.name} + 施肥`);
 console.log(`可获得 ${bestFert.totalExpFert} 经验，需要每 ${formatTime(bestFert.cycleFert)} 操作一次`);
+console.log(`消耗肥料 ${bestFert.fertCount} 个`);
 console.log('');
