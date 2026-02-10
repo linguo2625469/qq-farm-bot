@@ -77,6 +77,8 @@ async function insecticide(landIds) {
 
 // 普通肥料 ID
 const NORMAL_FERTILIZER_ID = 1011;
+// 有机肥料 ID
+const ORGANIC_FERTILIZER_ID = 1012;
 
 /**
  * 施肥 - 必须逐块进行，服务器不支持批量
@@ -96,7 +98,7 @@ async function fertilize(landIds, fertilizerId = NORMAL_FERTILIZER_ID) {
             // 施肥失败（可能肥料不足），停止继续
             break;
         }
-        if (landIds.length > 1) await sleep(50);  // 50ms 间隔
+        if (landIds.length > 1) await sleep(150);  // 50ms 间隔
     }
     return successCount;
 }
@@ -158,7 +160,7 @@ async function plantSeeds(seedId, landIds) {
         } catch (e) {
             logWarn('种植', `土地#${landId} 失败: ${e.message}`);
         }
-        if (landIds.length > 1) await sleep(50);  // 50ms 间隔
+        if (landIds.length > 1) await sleep(80);  // 50ms 间隔
     }
     return successCount;
 }
@@ -296,9 +298,15 @@ async function autoPlantEmptyLands(deadLandIds, emptyLandIds) {
 
     // 5. 施肥（逐块拖动，间隔50ms）
     if (plantedLands.length > 0) {
-        const fertilized = await fertilize(plantedLands);
+        const fertilized = await fertilize(plantedLands, NORMAL_FERTILIZER_ID);
         if (fertilized > 0) {
-            log('施肥', `已为 ${fertilized}/${plantedLands.length} 块地施肥`);
+            log('施肥', `已为 ${fertilized}/${plantedLands.length} 块地施普通肥`);
+        }
+    }
+	if (plantedLands.length > 0) {
+        const fertilized = await fertilize(plantedLands, ORGANIC_FERTILIZER_ID);
+        if (fertilized > 0) {
+            log('施肥', `已为 ${fertilized}/${plantedLands.length} 块地施有机肥`);
         }
     }
 }
