@@ -83,6 +83,7 @@ function parseArgs(args) {
 // ============ 主函数 ============
 async function main() {
     const args = process.argv.slice(2);
+    console.info(args)
 
     // 加载 proto 定义
     await loadProto();
