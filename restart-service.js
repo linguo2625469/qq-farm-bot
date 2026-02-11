@@ -17,13 +17,12 @@ const pm2 = require('pm2');
 
 const HTTP_PORT = 3002;
 const PM2_APP_NAME = 'farm-bot';
-const DEBOUNCE_INTERVAL = 30000;
+const DEBOUNCE_INTERVAL = 30000; // 30秒
 
 let server = null;
 let pm2Connected = false;
 let lastRequestTime = 0;
-let lastRequestCode = '';
-let pendingResponse = null;
+let isProcessing = false;
 
 function startHttpServer() {
     server = http.createServer(async (req, res) => {
@@ -111,16 +110,30 @@ async function restartPM2Process(code) {
                 const existingProcess = list.find(p => p.name === PM2_APP_NAME);
 
                 if (existingProcess) {
-                    console.log(`[Restart] 发现现有进程 ${PM2_APP_NAME}，正在重启...`);
+                    console.log(`[Restart] 发现现有进程 ${PM2_APP_NAME} (PID: ${existingProcess.pid})，正在停止...`);
                     
-                    pm2.restart(PM2_APP_NAME, (restartErr) => {
-                        if (restartErr) {
-                            reject(restartErr);
+                    pm2.stop(PM2_APP_NAME, (stopErr) => {
+                        if (stopErr) {
+                            console.error(`[Restart] 停止进程失败: ${stopErr.message}`);
+                            reject(stopErr);
                         } else {
-                            resolve({
-                                action: 'restart',
-                                appName: PM2_APP_NAME,
-                                pid: existingProcess.pid,
+                            console.log(`[Restart] 进程已停止，正在启动新进程...`);
+                            
+                            pm2.start({
+                                name: PM2_APP_NAME,
+                                script: 'client.js',
+                                args: [`--code ${code}`, '--wx'],
+                                cwd: process.cwd(),
+                            }, (startErr) => {
+                                if (startErr) {
+                                    reject(startErr);
+                                } else {
+                                    resolve({
+                                        action: 'restart',
+                                        appName: PM2_APP_NAME,
+                                        code: code.substring(0, 8) + '...',
+                                    });
+                                }
                             });
                         }
                     });
@@ -130,7 +143,7 @@ async function restartPM2Process(code) {
                     pm2.start({
                         name: PM2_APP_NAME,
                         script: 'client.js',
-                        args: `--code ${code}`,
+                        args: [`--code ${code}`, '--wx'],
                         cwd: process.cwd(),
                     }, (startErr) => {
                         if (startErr) {
@@ -139,7 +152,7 @@ async function restartPM2Process(code) {
                             resolve({
                                 action: 'start',
                                 appName: PM2_APP_NAME,
-                                command: `client.js --code ${code.substring(0, 8)}...`,
+                                code: code.substring(0, 8) + '...',
                             });
                         }
                     });
@@ -160,26 +173,40 @@ async function handleRequest(code, res, startTime) {
             return;
         }
 
+        // 防抖检查
         const now = Date.now();
         const timeSinceLastRequest = now - lastRequestTime;
-        const isDuplicate = timeSinceLastRequest < DEBOUNCE_INTERVAL && code === lastRequestCode;
 
-        if (isDuplicate) {
-            console.log(`[Restart] 防抖: 忽略重复请求 (${Math.round(timeSinceLastRequest / 1000)}s 内) code=${code.substring(0, 8)}...`);
+        if (timeSinceLastRequest < DEBOUNCE_INTERVAL) {
+            const remaining = Math.ceil((DEBOUNCE_INTERVAL - timeSinceLastRequest) / 1000);
+            console.log(`[Restart] 防抖: 忽略请求 (${remaining}s 后可用) code=${code.substring(0, 8)}...`);
             res.writeHead(500);
             res.end(JSON.stringify({
-                success: true,
-                message: 'Request debounced (duplicate)',
-                code: code.substring(0, 8) + '...',
+                success: false,
+                message: 'Request debounced',
+                remainingSeconds: remaining,
                 debounced: true,
             }));
             return;
         }
 
-        console.log(`[Restart] 收到重启请求: code=${code.substring(0, 8)}...`);
+        // 检查是否正在处理中
+        if (isProcessing) {
+            console.log(`[Restart] 防抖: 请求正在处理中，忽略新请求 code=${code.substring(0, 8)}...`);
+            res.writeHead(500);
+            res.end(JSON.stringify({
+                success: false,
+                message: 'Request is being processed',
+                debounced: true,
+            }));
+            return;
+        }
 
+        // 标记开始处理
+        isProcessing = true;
         lastRequestTime = now;
-        lastRequestCode = code;
+
+        console.log(`[Restart] 收到重启请求: code=${code.substring(0, 8)}...`);
 
         const result = await restartPM2Process(code);
         const elapsed = Date.now() - startTime;
@@ -201,6 +228,9 @@ async function handleRequest(code, res, startTime) {
             success: false,
             error: err.message,
         }));
+    } finally {
+        // 标记处理完成
+        isProcessing = false;
     }
 }
 
