@@ -17,9 +17,13 @@ const pm2 = require('pm2');
 
 const HTTP_PORT = 3002;
 const PM2_APP_NAME = 'farm-bot';
+const DEBOUNCE_INTERVAL = 30000;
 
 let server = null;
 let pm2Connected = false;
+let lastRequestTime = 0;
+let lastRequestCode = '';
+let pendingResponse = null;
 
 function startHttpServer() {
     server = http.createServer(async (req, res) => {
@@ -61,7 +65,26 @@ function startHttpServer() {
                     return;
                 }
 
+                const now = Date.now();
+                const timeSinceLastRequest = now - lastRequestTime;
+                const isDuplicate = timeSinceLastRequest < DEBOUNCE_INTERVAL && code === lastRequestCode;
+
+                if (isDuplicate) {
+                    console.log(`[Restart] 防抖: 忽略重复请求 (${Math.round(timeSinceLastRequest / 1000)}s 内) code=${code.substring(0, 8)}...`);
+                    res.writeHead(200);
+                    res.end(JSON.stringify({
+                        success: true,
+                        message: 'Request debounced (duplicate)',
+                        code: code.substring(0, 8) + '...',
+                        debounced: true,
+                    }));
+                    return;
+                }
+
                 console.log(`[Restart] 收到重启请求: code=${code.substring(0, 8)}...`);
+
+                lastRequestTime = now;
+                lastRequestCode = code;
 
                 const result = await restartPM2Process(code);
                 const elapsed = Date.now() - startTime;
