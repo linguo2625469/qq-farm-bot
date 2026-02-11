@@ -46,7 +46,7 @@ function startHttpServer() {
             return;
         }
 
-        if (req.url !== '/restart') {
+        if (!req.url.includes('/restart')) {
             res.writeHead(500);
             res.end(JSON.stringify({ error: 'Not found', path: req.url }));
             return;
