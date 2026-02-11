@@ -7,10 +7,14 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node client.js",
+    "start:broadcast": "node websocket-broadcast.js",
+    "start:restart": "node restart-service.js"
   },
   "dependencies": {
     "long": "^5.3.2",
+    "pm2": "^5.4.3",
     "protobufjs": "^8.0.0",
     "ws": "^8.19.0"
   }

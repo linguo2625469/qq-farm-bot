@@ -591,8 +591,17 @@ function stopFarmCheckLoop() {
     networkEvents.removeListener('landsChanged', onLandsChangedPush);
 }
 
+function getFarmState() {
+    return {
+        isCheckingFarm,
+        farmLoopRunning,
+        isFirstFarmCheck,
+    };
+}
+
 module.exports = {
     checkFarm, startFarmCheckLoop, stopFarmCheckLoop,
     getCurrentPhase,
     setOperationLimitsCallback,
+    getFarmState,
 };

@@ -452,9 +452,20 @@ function cleanup() {
 
 function getWs() { return ws; }
 
+function getConnectionState() {
+    return {
+        connected: ws && ws.readyState === WebSocket.OPEN,
+        readyState: ws ? ws.readyState : -1,
+        pendingRequests: pendingCallbacks.size,
+        lastHeartbeatResponse,
+        heartbeatMissCount,
+    };
+}
+
 module.exports = {
     connect, cleanup, getWs,
     sendMsg, sendMsgAsync,
     getUserState,
     networkEvents,
+    getConnectionState,
 };

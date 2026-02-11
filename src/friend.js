@@ -644,7 +644,27 @@ async function acceptFriendsWithRetry(gids) {
     }
 }
 
+function getFriendState() {
+    const limits = {};
+    for (const [opId, data] of operationLimits) {
+        const opName = OP_NAMES[opId] || `op_${opId}`;
+        limits[opName] = {
+            dayTimes: data.dayTimes,
+            dayTimesLimit: data.dayTimesLimit,
+            dayExpTimes: data.dayExpTimes,
+            dayExpTimesLimit: data.dayExpTimesLimit,
+        };
+    }
+    return {
+        isCheckingFriends,
+        isFirstFriendCheck,
+        friendLoopRunning,
+        operationLimits: limits,
+    };
+}
+
 module.exports = {
     checkFriends, startFriendCheckLoop, stopFriendCheckLoop,
     checkAndAcceptApplications,
+    getFriendState,
 };

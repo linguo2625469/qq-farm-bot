@@ -8,7 +8,7 @@ const { sendMsgAsync } = require('./network');
 const { toLong, toNum, log, logWarn, sleep } = require('./utils');
 const { getFruitName } = require('./gameConfig');
 
-// 果实 ID 范围：Plant.json 中 fruit.id 为 4xxxx；部分接口可能用 3xxx，两段都视为果实
+// 果实 ID 范围：Plant.json 中。fruit.id 为 4xxxx；部分接口可能用 3xxx，两段都视为果实
 const FRUIT_ID_MIN = 3001;
 const FRUIT_ID_MAX = 49999;
 
@@ -17,6 +17,9 @@ const SELL_BATCH_SIZE = 15;
 
 let sellTimer = null;
 let sellInterval = 60000;
+let lastSellTime = 0;
+let totalSoldGold = 0;
+let fruitCount = 0;
 
 async function getBag() {
     const body = types.BagRequest.encode(types.BagRequest.create({})).finish();
@@ -75,6 +78,8 @@ async function sellAllFruits() {
             totalGold += toNum(reply.gold || 0);
             if (i + SELL_BATCH_SIZE < toSell.length) await sleep(300);
         }
+        lastSellTime = Date.now();
+        totalSoldGold += totalGold;
         log('仓库', `出售 ${names.join(', ')}，获得 ${totalGold} 金币`);
     } catch (e) {
         logWarn('仓库', `出售失败: ${e.message}`);
@@ -105,6 +110,8 @@ async function debugSellFruits() {
             if (id >= FRUIT_ID_MIN && id <= FRUIT_ID_MAX && count > 0)
                 toSell.push(item);
         }
+
+        fruitCount = toSell.length;
 
         if (toSell.length === 0) {
             log('仓库', '没有果实可出售');
@@ -144,6 +151,16 @@ function stopSellLoop() {
     }
 }
 
+function getWarehouseState() {
+    return {
+        fruitCount,
+        lastSellTime,
+        totalSoldGold,
+        sellInterval,
+        isSelling: sellTimer !== null,
+    };
+}
+
 module.exports = {
     getBag,
     sellItems,
@@ -152,4 +169,5 @@ module.exports = {
     getBagItems,
     startSellLoop,
     stopSellLoop,
+    getWarehouseState,
 };

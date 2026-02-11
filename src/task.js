@@ -6,6 +6,8 @@ const { types } = require('./proto');
 const { sendMsgAsync, networkEvents } = require('./network');
 const { toLong, toNum, log, logWarn, sleep } = require('./utils');
 
+let lastTaskInfo = null;
+
 // ============ 任务 API ============
 
 async function getTaskInfo() {
@@ -87,6 +89,8 @@ async function checkAndClaimTasks() {
         if (!reply.task_info) return;
 
         const taskInfo = reply.task_info;
+        lastTaskInfo = taskInfo;
+
         const allTasks = [
             ...(taskInfo.growth_tasks || []),
             ...(taskInfo.daily_tasks || []),
@@ -174,8 +178,31 @@ function cleanupTaskSystem() {
     networkEvents.off('taskInfoNotify', onTaskInfoNotify);
 }
 
+function getTaskState() {
+    if (!lastTaskInfo) {
+        return {
+            totalTasks: 0,
+            claimableTasks: 0,
+        };
+    }
+
+    const allTasks = [
+        ...(lastTaskInfo.growth_tasks || []),
+        ...(lastTaskInfo.daily_tasks || []),
+        ...(lastTaskInfo.tasks || []),
+    ];
+
+    const claimable = analyzeTaskList(allTasks);
+
+    return {
+        totalTasks: allTasks.length,
+        claimableTasks: claimable.length,
+    };
+}
+
 module.exports = {
     checkAndClaimTasks,
     initTaskSystem,
     cleanupTaskSystem,
+    getTaskState,
 };
