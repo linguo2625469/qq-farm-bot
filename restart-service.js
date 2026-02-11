@@ -3,7 +3,7 @@
  * 
  * 功能:
  * - 启动 HTTP 服务器 (端口 3002)
- * - 提供 POST /restart 接口
+ * - 提供 GET /restart 接口
  * - 接收 { code: string } 参数
  * - 使用 pm2 重启游戏脚本
  * 
@@ -31,89 +31,40 @@ function startHttpServer() {
 
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
         if (req.method === 'OPTIONS') {
-            res.writeHead(200);
+            res.writeHead(500);
             res.end();
             return;
         }
 
-        if (req.method !== 'POST') {
-            res.writeHead(405);
-            res.end(JSON.stringify({ error: 'Method not allowed', method: 'POST' }));
+        if (req.method !== 'GET') {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Method not allowed', allowedMethods: ['GET'] }));
             return;
         }
 
         if (req.url !== '/restart') {
-            res.writeHead(404);
+            res.writeHead(500);
             res.end(JSON.stringify({ error: 'Not found', path: req.url }));
             return;
         }
 
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
-        req.on('end', async () => {
-            try {
-                const data = JSON.parse(body);
-                const { code } = data;
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const params = Object.fromEntries(url.searchParams.entries());
+        
+        console.log(`[Restart] 收到请求，查询参数:`, params);
 
-                if (!code || typeof code !== 'string') {
-                    res.writeHead(400);
-                    res.end(JSON.stringify({ error: 'Invalid code parameter' }));
-                    return;
-                }
+        const code = params.code || '';
 
-                const now = Date.now();
-                const timeSinceLastRequest = now - lastRequestTime;
-                const isDuplicate = timeSinceLastRequest < DEBOUNCE_INTERVAL && code === lastRequestCode;
-
-                if (isDuplicate) {
-                    console.log(`[Restart] 防抖: 忽略重复请求 (${Math.round(timeSinceLastRequest / 1000)}s 内) code=${code.substring(0, 8)}...`);
-                    res.writeHead(200);
-                    res.end(JSON.stringify({
-                        success: true,
-                        message: 'Request debounced (duplicate)',
-                        code: code.substring(0, 8) + '...',
-                        debounced: true,
-                    }));
-                    return;
-                }
-
-                console.log(`[Restart] 收到重启请求: code=${code.substring(0, 8)}...`);
-
-                lastRequestTime = now;
-                lastRequestCode = code;
-
-                const result = await restartPM2Process(code);
-                const elapsed = Date.now() - startTime;
-
-                res.writeHead(200);
-                res.end(JSON.stringify({
-                    success: true,
-                    message: 'Restart initiated',
-                    code: code.substring(0, 8) + '...',
-                    elapsed,
-                    ...result,
-                }));
-
-                console.log(`[Restart] 重启请求完成 (${elapsed}ms)`);
-            } catch (err) {
-                console.error(`[Restart] 错误: ${err.message}`);
-                res.writeHead(500);
-                res.end(JSON.stringify({
-                    success: false,
-                    error: err.message,
-                }));
-            }
-        });
+        await handleRequest(code, res, startTime);
     });
 
     server.listen(HTTP_PORT, () => {
         console.log(`[Restart] HTTP 服务器启动在端口 ${HTTP_PORT}`);
-        console.log(`[Restart] 接口: POST http://localhost:${HTTP_PORT}/restart`);
-        console.log(`[Restart] 参数: { "code": "xxx" }`);
+        console.log(`[Restart] 接口: GET http://localhost:${HTTP_PORT}/restart?code=xxx`);
     });
 }
 
@@ -198,6 +149,58 @@ async function restartPM2Process(code) {
     } catch (err) {
         console.error(`[Restart] PM2 操作失败: ${err.message}`);
         throw err;
+    }
+}
+
+async function handleRequest(code, res, startTime) {
+    try {
+        if (!code || typeof code !== 'string') {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Invalid code parameter' }));
+            return;
+        }
+
+        const now = Date.now();
+        const timeSinceLastRequest = now - lastRequestTime;
+        const isDuplicate = timeSinceLastRequest < DEBOUNCE_INTERVAL && code === lastRequestCode;
+
+        if (isDuplicate) {
+            console.log(`[Restart] 防抖: 忽略重复请求 (${Math.round(timeSinceLastRequest / 1000)}s 内) code=${code.substring(0, 8)}...`);
+            res.writeHead(500);
+            res.end(JSON.stringify({
+                success: true,
+                message: 'Request debounced (duplicate)',
+                code: code.substring(0, 8) + '...',
+                debounced: true,
+            }));
+            return;
+        }
+
+        console.log(`[Restart] 收到重启请求: code=${code.substring(0, 8)}...`);
+
+        lastRequestTime = now;
+        lastRequestCode = code;
+
+        const result = await restartPM2Process(code);
+        const elapsed = Date.now() - startTime;
+
+        res.writeHead(500);
+        res.end(JSON.stringify({
+            success: true,
+            message: 'Restart initiated',
+            code: code.substring(0, 8) + '...',
+            elapsed,
+            ...result,
+        }));
+
+        console.log(`[Restart] 重启请求完成 (${elapsed}ms)`);
+    } catch (err) {
+        console.error(`[Restart] 错误: ${err.message}`);
+        res.writeHead(500);
+        res.end(JSON.stringify({
+            success: false,
+            error: err.message,
+        }));
     }
 }
 
