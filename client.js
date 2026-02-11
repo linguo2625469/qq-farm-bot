@@ -21,6 +21,7 @@ const { initStatusBar, cleanupStatusBar, setStatusPlatform } = require('./src/st
 const { startSellLoop, stopSellLoop, debugSellFruits } = require('./src/warehouse');
 const { processInviteCodes } = require('./src/invite');
 const { verifyMode, decodeMode } = require('./src/decode');
+const { startWebSocketServer: startGameStateBroadcast, stopWebSocketServer: stopGameStateBroadcast } = require('./src/game-state-broadcast');
 
 // ============ 帮助信息 ============
 function showHelp() {
@@ -109,6 +110,9 @@ async function main() {
     initStatusBar();
     setStatusPlatform(CONFIG.platform);
 
+    // 启动游戏状态广播服务
+    startGameStateBroadcast();
+
     const platformName = CONFIG.platform === 'wx' ? '微信' : 'QQ';
     console.log(`[启动] ${platformName} code=${code.substring(0, 8)}... 农场${CONFIG.farmCheckInterval / 1000}s 好友${CONFIG.friendCheckInterval / 1000}s`);
 
@@ -134,6 +138,7 @@ async function main() {
         stopFriendCheckLoop();
         cleanupTaskSystem();
         stopSellLoop();
+        stopGameStateBroadcast();
         cleanup();
         const ws = getWs();
         if (ws) ws.close();
