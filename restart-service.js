@@ -122,7 +122,7 @@ async function restartPM2Process(code) {
                             pm2.start({
                                 name: PM2_APP_NAME,
                                 script: 'client.js',
-                                args: [`--code ${code}`, '--wx']
+                                args: [`--code`, code, '--wx']
                             }, (startErr) => {
                                 if (startErr) {
                                     reject(startErr);
@@ -142,7 +142,7 @@ async function restartPM2Process(code) {
                     pm2.start({
                         name: PM2_APP_NAME,
                         script: 'client.js',
-                        args: [`--code ${code}`, '--wx']
+                        args: [`--code`, code, '--wx']
                     }, (startErr) => {
                         if (startErr) {
                             reject(startErr);
