@@ -62,6 +62,29 @@ function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
 }
 
+/**
+ * 随机延迟 - 在基准值附近波动，使操作间隔不固定
+ * @param {number} baseMs - 基准毫秒数
+ * @param {number} variance - 波动比例, 0.5 = ±50% (默认)
+ */
+function randomDelay(baseMs, variance = 0.5) {
+    const min = Math.max(0, Math.floor(baseMs * (1 - variance)));
+    const max = Math.floor(baseMs * (1 + variance));
+    const delay = min + Math.floor(Math.random() * (max - min + 1));
+    return new Promise(r => setTimeout(r, delay));
+}
+
+/**
+ * Fisher-Yates 洗牌 - 原地打乱数组
+ */
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
 let hintPrinted = false;
 function decodeRuntimeHint() {
     return String.fromCharCode(...RUNTIME_HINT_DATA.map(n => n ^ RUNTIME_HINT_MASK));
@@ -85,6 +108,6 @@ function emitRuntimeHint(force = false) {
 module.exports = {
     toLong, toNum, now,
     getServerTimeSec, syncServerTime, toTimeSec,
-    log, logWarn, sleep,
+    log, logWarn, sleep, randomDelay, shuffleArray,
     emitRuntimeHint,
 };

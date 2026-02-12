@@ -416,8 +416,8 @@ function startHeartbeat() {
 }
 
 // ============ WebSocket 连接 ============
-function connect(code, onLoginSuccess) {
-    const url = `${CONFIG.serverUrl}?platform=${CONFIG.platform}&os=${CONFIG.os}&ver=${CONFIG.clientVersion}&code=${code}&openID=`;
+function connect(onLoginSuccess) {
+    const url = `${CONFIG.serverUrl}?platform=${CONFIG.platform}&os=${CONFIG.os}&ver=${CONFIG.clientVersion}&code=${CONFIG.code}&openID=`;
 
     ws = new WebSocket(url, {
         headers: {

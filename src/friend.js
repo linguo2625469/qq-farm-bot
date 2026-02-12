@@ -5,7 +5,7 @@
 const { CONFIG, PlantPhase, PHASE_NAMES } = require('./config');
 const { types } = require('./proto');
 const { sendMsgAsync, getUserState, networkEvents } = require('./network');
-const { toLong, toNum, getServerTimeSec, log, logWarn, sleep } = require('./utils');
+const { toLong, toNum, getServerTimeSec, log, logWarn, sleep, randomDelay, shuffleArray } = require('./utils');
 const { getCurrentPhase, setOperationLimitsCallback } = require('./farm');
 const { getPlantName } = require('./gameConfig');
 
@@ -359,7 +359,7 @@ async function visitFriend(friend, totalActions, myGid) {
             let ok = 0;
             for (const landId of status.needWeed) {
                 try { await helpWeed(gid, [landId]); ok++; } catch (e) { /* ignore */ }
-                await sleep(100);
+                await randomDelay(100);
             }
             if (ok > 0) { actions.push(`草${ok}`); totalActions.weed += ok; }
         }
@@ -371,7 +371,7 @@ async function visitFriend(friend, totalActions, myGid) {
             let ok = 0;
             for (const landId of status.needBug) {
                 try { await helpInsecticide(gid, [landId]); ok++; } catch (e) { /* ignore */ }
-                await sleep(100);
+                await randomDelay(100);
             }
             if (ok > 0) { actions.push(`虫${ok}`); totalActions.bug += ok; }
         }
@@ -383,7 +383,7 @@ async function visitFriend(friend, totalActions, myGid) {
             let ok = 0;
             for (const landId of status.needWater) {
                 try { await helpWater(gid, [landId]); ok++; } catch (e) { /* ignore */ }
-                await sleep(100);
+                await randomDelay(100);
             }
             if (ok > 0) { actions.push(`水${ok}`); totalActions.water += ok; }
         }
@@ -402,7 +402,7 @@ async function visitFriend(friend, totalActions, myGid) {
                     stolenPlants.push(status.stealableInfo[i].name);
                 }
             } catch (e) { /* ignore */ }
-            await sleep(100);
+            await randomDelay(100);
         }
         if (ok > 0) {
             const plantNames = [...new Set(stolenPlants)].join('/');
@@ -419,7 +419,7 @@ async function visitFriend(friend, totalActions, myGid) {
         for (const landId of toProcess) {
             if (!canOperate(10004)) break;
             try { await putInsects(gid, [landId]); ok++; } catch (e) { /* ignore */ }
-            await sleep(100);
+            await randomDelay(100);
         }
         if (ok > 0) { actions.push(`放虫${ok}`); totalActions.putBug += ok; }
     }
@@ -431,7 +431,7 @@ async function visitFriend(friend, totalActions, myGid) {
         for (const landId of toProcess) {
             if (!canOperate(10003)) break;
             try { await putWeeds(gid, [landId]); ok++; } catch (e) { /* ignore */ }
-            await sleep(100);
+            await randomDelay(100);
         }
         if (ok > 0) { actions.push(`放草${ok}`); totalActions.putWeed += ok; }
     }
@@ -500,7 +500,9 @@ async function checkFriends() {
             }
         }
         
-        // 合并列表：优先好友在前
+        // 分别打乱顺序后合并：优先好友在前
+        shuffleArray(priorityFriends);
+        shuffleArray(otherFriends);
         const friendsToVisit = [...priorityFriends, ...otherFriends];
         
         // 调试：检查目标好友位置
@@ -533,7 +535,7 @@ async function checkFriends() {
                     console.log(`[调试] 访问 [${friend.name}] 出错: ${e.message}`);
                 }
             }
-            await sleep(500);
+            await randomDelay(500);
             // 如果捣乱次数用完了，且没有其他操作，可以提前结束
             if (!canOperate(10004) && !canOperate(10003)) {  // 10004=放虫, 10003=放草
                 // 继续巡查，但不再放虫放草
@@ -567,7 +569,7 @@ async function friendCheckLoop() {
     while (friendLoopRunning) {
         await checkFriends();
         if (!friendLoopRunning) break;
-        await sleep(CONFIG.friendCheckInterval);
+        await randomDelay(CONFIG.friendCheckInterval, 0.3);  // ±30% 随机波动
     }
 }
 
