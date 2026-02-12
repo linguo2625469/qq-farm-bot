@@ -8,6 +8,12 @@ const { CONFIG } = require('./config');
 const { types } = require('./proto');
 const { toLong, toNum, syncServerTime, log, logWarn } = require('./utils');
 const { updateStatusFromLogin, updateStatusGold, updateStatusLevel } = require('./status');
+const path = require("path");
+const fs = require("fs");
+
+// 读取植物配置
+const plantPath = path.join(__dirname, '..', 'gameConfig', 'Plant.json');
+const plants = JSON.parse(fs.readFileSync(plantPath, 'utf8'));
 
 // ============ 事件发射器 (用于推送通知) ============
 const networkEvents = new EventEmitter();
