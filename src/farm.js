@@ -6,7 +6,7 @@ const protobuf = require('protobufjs');
 const { CONFIG, PlantPhase, PHASE_NAMES } = require('./config');
 const { types } = require('./proto');
 const { sendMsgAsync, getUserState, networkEvents } = require('./network');
-const { toLong, toNum, getServerTimeSec, toTimeSec, log, logWarn, sleep } = require('./utils');
+const { toLong, toNum, getServerTimeSec, toTimeSec, log, logWarn, sleep, randomDelay, shuffleArray } = require('./utils');
 const { getPlantNameBySeedId, getPlantName, getPlantExp, formatGrowTime, getPlantGrowTime } = require('./gameConfig');
 const { getPlantingRecommendation } = require('../tools/calc-exp-yield');
 
@@ -97,7 +97,7 @@ async function fertilize(landIds, fertilizerId = NORMAL_FERTILIZER_ID) {
             // 施肥失败（可能肥料不足），停止继续
             break;
         }
-        if (landIds.length > 1) await sleep(50);  // 50ms 间隔
+        if (landIds.length > 1) await randomDelay(50);  // ~25-75ms 随机间隔
     }
     return successCount;
 }
@@ -159,7 +159,7 @@ async function plantSeeds(seedId, landIds) {
         } catch (e) {
             logWarn('种植', `土地#${landId} 失败: ${e.message}`);
         }
-        if (landIds.length > 1) await sleep(50);  // 50ms 间隔
+        if (landIds.length > 1) await randomDelay(50);  // ~25-75ms 随机间隔
     }
     return successCount;
 }
@@ -173,9 +173,14 @@ async function findBestSeed(landsCount) {
     }
 
     const state = getUserState();
+    const excludedSet = new Set(CONFIG.excludedSeeds);
     const available = [];
     for (const goods of shopReply.goods_list) {
         if (!goods.unlocked) continue;
+
+        // 排除指定种子 (白萝卜/胡萝卜等)
+        const itemId = toNum(goods.item_id);
+        if (excludedSet.has(itemId)) continue;
 
         let meetsConditions = true;
         let requiredLevel = 0;
@@ -198,7 +203,7 @@ async function findBestSeed(landsCount) {
         available.push({
             goods,
             goodsId: toNum(goods.id),
-            seedId: toNum(goods.item_id),
+            seedId: itemId,
             price: toNum(goods.price),
             requiredLevel,
         });
@@ -216,23 +221,33 @@ async function findBestSeed(landsCount) {
 
     try {
         log('商店', `等级: ${state.level}，土地数量: ${landsCount}`);
-        
+
         const rec = getPlantingRecommendation(state.level, landsCount == null ? 18 : landsCount, { top: 50 });
         const rankedSeedIds = rec.candidatesNormalFert.map(x => x.seedId);
+
+        // 收集前 N 个可购买的候选种子
+        const topCandidates = [];
         for (const seedId of rankedSeedIds) {
             const hit = available.find(x => x.seedId === seedId);
-            if (hit) return hit;
+            if (hit) {
+                topCandidates.push(hit);
+                if (topCandidates.length >= CONFIG.topCandidateCount) break;
+            }
+        }
+
+        if (topCandidates.length > 0) {
+            // 从候选中随机选择一个
+            const pick = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+            const names = topCandidates.map(c => getPlantNameBySeedId(c.seedId)).join('/');
+            log('商店', `候选种子(${topCandidates.length}): ${names} → 随机选择: ${getPlantNameBySeedId(pick.seedId)}`);
+            return pick;
         }
     } catch (e) {
         logWarn('商店', `经验效率推荐失败，使用兜底策略: ${e.message}`);
     }
 
-    // 兜底：等级在28级以前还是白萝卜比较好，28级以上选最高等级的种子
-    if(state.level && state.level <= 28){
-        available.sort((a, b) => a.requiredLevel - b.requiredLevel);
-    }else{
-        available.sort((a, b) => b.requiredLevel - a.requiredLevel);
-    }
+    // 兜底：选最高等级的种子
+    available.sort((a, b) => b.requiredLevel - a.requiredLevel);
     return available[0];
 }
 
@@ -254,6 +269,9 @@ async function autoPlantEmptyLands(deadLandIds, emptyLandIds, unlockedLandCount)
     }
 
     if (landsToPlant.length === 0) return;
+
+    // 打乱种植顺序，避免固定模式
+    shuffleArray(landsToPlant);
 
     // 2. 查询种子商店
     let bestSeed;
@@ -565,7 +583,7 @@ async function farmCheckLoop() {
     while (farmLoopRunning) {
         await checkFarm();
         if (!farmLoopRunning) break;
-        await sleep(CONFIG.farmCheckInterval);
+        await randomDelay(CONFIG.farmCheckInterval, 0.3);  // ±30% 随机波动
     }
 }
 

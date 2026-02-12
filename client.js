@@ -30,17 +30,34 @@ QQ经典农场 挂机脚本
 ====================
 
 用法:
-  node client.js --code <登录code> [--wx] [--interval <秒>] [--friend-interval <秒>]
+  FARM_CODE=<登录code> node client.js
   node client.js --verify
   node client.js --decode <数据> [--hex] [--gate] [--type <消息类型>]
 
-参数:
-  --code              小程序 login() 返回的临时凭证 (必需)
-  --wx                使用微信登录 (默认为QQ小程序)
-  --interval          自己农场巡查完成后等待秒数, 默认10秒, 最低10秒
-  --friend-interval   好友巡查完成后等待秒数, 默认1秒, 最低1秒
+环境变量:
+  FARM_CODE                    小程序 login() 返回的临时凭证 (必需)
+  FARM_PLATFORM                平台: qq (默认) 或 wx (微信)
+  FARM_CHECK_INTERVAL          自己农场巡查完成后等待秒数, 默认1, 最低1
+  FARM_FRIEND_CHECK_INTERVAL   好友巡查完成后等待秒数, 默认10, 最低1
+  FARM_FORCE_LOWEST_CROP       固定种最低等级作物 (true/false, 默认false)
+  FARM_TOP_CANDIDATES          从前N个最优种子中随机选择 (默认5)
+
+开发工具:
   --verify            验证proto定义
   --decode            解码PB数据 (运行 --decode 无参数查看详细帮助)
+
+PM2 示例:
+  ecosystem.config.js:
+  module.exports = {
+    apps: [{
+      name: 'farm',
+      script: 'client.js',
+      env: {
+        FARM_CODE: 'your-code-here',
+        FARM_PLATFORM: 'qq',
+      }
+    }]
+  }
 
 功能:
   - 自动收获成熟作物 → 购买种子 → 种植 → 施肥
@@ -51,40 +68,13 @@ QQ经典农场 挂机脚本
   - 每分钟自动出售仓库果实
   - 启动时读取 share.txt 处理邀请码 (仅微信)
   - 心跳保活
+  - 从经验最优种子中随机选择，排除白萝卜/胡萝卜
+  - 操作延迟随机化，好友访问顺序随机化
 
 邀请码文件 (share.txt):
   每行一个邀请链接，格式: ?uid=xxx&openid=xxx&share_source=xxx&doc_id=xxx
   启动时会尝试通过 SyncAll API 同步这些好友
 `);
-}
-
-// ============ 参数解析 ============
-function parseArgs(args) {
-    const options = {
-        code: '',
-        deleteAccountMode: false,
-        name: '',
-        certId: '',
-        certType: 0,
-    };
-
-    for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--code' && args[i + 1]) {
-            options.code = args[++i];
-        }
-        if (args[i] === '--wx') {
-            CONFIG.platform = 'wx';
-        }
-        if (args[i] === '--interval' && args[i + 1]) {
-            const sec = parseInt(args[++i]);
-            CONFIG.farmCheckInterval = Math.max(sec, 1) * 1000;
-        }
-        if (args[i] === '--friend-interval' && args[i + 1]) {
-            const sec = parseInt(args[++i]);
-            CONFIG.friendCheckInterval = Math.max(sec, 1) * 1000;  // 最低1秒
-        }
-    }
-    return options;
 }
 
 // ============ 主函数 ============
@@ -94,26 +84,21 @@ async function main() {
     // 加载 proto 定义
     await loadProto();
 
-    // 验证模式
+    // 验证模式 (开发工具，保留CLI参数)
     if (args.includes('--verify')) {
         await verifyMode();
         return;
     }
 
-    // 解码模式
+    // 解码模式 (开发工具，保留CLI参数)
     if (args.includes('--decode')) {
         await decodeMode(args);
         return;
     }
 
-    // 正常挂机模式
-    const options = parseArgs(args);
-    if (!options.code) {
-        showHelp();
-        process.exit(1);
-    }
-    if (options.deleteAccountMode && (!options.name || !options.certId)) {
-        console.log('[参数] 注销账号模式必须提供 --name 和 --cert-id');
+    // 正常挂机模式 - 从环境变量读取配置
+    if (!CONFIG.code) {
+        console.error('[错误] 未设置 FARM_CODE 环境变量');
         showHelp();
         process.exit(1);
     }
@@ -124,17 +109,17 @@ async function main() {
     emitRuntimeHint(true);
 
     const platformName = CONFIG.platform === 'wx' ? '微信' : 'QQ';
-    console.log(`[启动] ${platformName} code=${options.code.substring(0, 8)}... 农场${CONFIG.farmCheckInterval / 1000}s 好友${CONFIG.friendCheckInterval / 1000}s`);
+    console.log(`[启动] ${platformName} code=${CONFIG.code.substring(0, 8)}... 农场${CONFIG.farmCheckInterval / 1000}s 好友${CONFIG.friendCheckInterval / 1000}s`);
 
     // 连接并登录，登录成功后启动各功能模块
-    connect(options.code, async () => {
+    connect(async () => {
         // 处理邀请码 (仅微信环境)
         await processInviteCodes();
-        
+
         startFarmCheckLoop();
         startFriendCheckLoop();
         initTaskSystem();
-        
+
         // 启动时立即检查一次背包
         setTimeout(() => debugSellFruits(), 5000);
         startSellLoop(60000);  // 每分钟自动出售仓库果实
