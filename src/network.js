@@ -8,6 +8,12 @@ const { CONFIG } = require('./config');
 const { types } = require('./proto');
 const { toLong, toNum, syncServerTime, log, logWarn } = require('./utils');
 const { updateStatusFromLogin, updateStatusGold, updateStatusLevel } = require('./status');
+const path = require("path");
+const fs = require("fs");
+
+// 读取植物配置
+const plantPath = path.join(__dirname, '..', 'gameConfig', 'Plant.json');
+const plants = JSON.parse(fs.readFileSync(plantPath, 'utf8'));
 
 // ============ 事件发射器 (用于推送通知) ============
 const networkEvents = new EventEmitter();
@@ -67,7 +73,7 @@ function sendMsgAsync(serviceName, methodName, bodyBytes, timeout = 10000) {
             reject(new Error(`连接未打开: ${methodName}`));
             return;
         }
-        
+
         const seq = clientSeq;
         const timer = setTimeout(() => {
             pendingCallbacks.delete(seq);
@@ -81,7 +87,7 @@ function sendMsgAsync(serviceName, methodName, bodyBytes, timeout = 10000) {
             if (err) reject(err);
             else resolve({ body, meta });
         });
-        
+
         if (!sent) {
             clearTimeout(timer);
             reject(new Error(`发送失败: ${methodName}`));
@@ -192,7 +198,7 @@ function handleNotify(msg) {
                     if (!item) continue;
                     const id = toNum(item.id);
                     const count = toNum(item.count);
-                    
+
                     if (id === 1101 || id === 2) {
                         userState.exp = count;
                         updateStatusLevel(userState.level, count);
@@ -356,6 +362,16 @@ function sendLogin(onLoginSuccess) {
                 console.log(`  昵称:   ${userState.name}`);
                 console.log(`  等级:   ${userState.level}`);
                 console.log(`  金币:   ${userState.gold}`);
+                console.log(`  平台:   ${CONFIG.platform}`);
+                console.log(`  指定种植作物:   ${CONFIG.farm_seedId}`);
+                if (CONFIG.farm_seedId) {
+                    const availablePlants = plants.filter(p => {
+                        return p.seed_id === CONFIG.farm_seedId
+                    });
+                    if (availablePlants.length > 0) {
+                        console.log(`  指定种植作物名称:   ${availablePlants[0].name}`);
+                    }
+                }
                 if (reply.time_now_millis) {
                     syncServerTime(toNum(reply.time_now_millis));
                     console.log(`  时间:   ${new Date(toNum(reply.time_now_millis)).toLocaleString()}`);
@@ -380,10 +396,10 @@ function startHeartbeat() {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     lastHeartbeatResponse = Date.now();
     heartbeatMissCount = 0;
-    
+
     heartbeatTimer = setInterval(() => {
         if (!userState.gid) return;
-        
+
         // 检查上次心跳响应时间，超过 60 秒没响应说明连接有问题
         const timeSinceLastResponse = Date.now() - lastHeartbeatResponse;
         if (timeSinceLastResponse > 60000) {
@@ -398,7 +414,7 @@ function startHeartbeat() {
                 pendingCallbacks.clear();
             }
         }
-        
+
         const body = types.HeartbeatRequest.encode(types.HeartbeatRequest.create({
             gid: toLong(userState.gid),
             client_version: CONFIG.clientVersion,

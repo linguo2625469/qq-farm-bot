@@ -75,6 +75,9 @@ function parseArgs(args) {
         if (args[i] === '--wx') {
             CONFIG.platform = 'wx';
         }
+        if (args[i] === '--farm_seedId' && args[i + 1]) {
+            CONFIG.farm_seedId = parseInt(args[++i]);
+        }
         if (args[i] === '--interval' && args[i + 1]) {
             const sec = parseInt(args[++i]);
             CONFIG.farmCheckInterval = Math.max(sec, 1) * 1000;
@@ -130,11 +133,11 @@ async function main() {
     connect(options.code, async () => {
         // 处理邀请码 (仅微信环境)
         await processInviteCodes();
-        
+
         startFarmCheckLoop();
         startFriendCheckLoop();
         initTaskSystem();
-        
+
         // 启动时立即检查一次背包
         setTimeout(() => debugSellFruits(), 5000);
         startSellLoop(60000);  // 每分钟自动出售仓库果实

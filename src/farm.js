@@ -208,6 +208,17 @@ async function findBestSeed(landsCount) {
         logWarn('商店', '没有可购买的种子');
         return null;
     }
+    // 指定种植
+    if(CONFIG.farm_seedId){
+        for (const a of available) {
+            if(a['seedId'] === CONFIG.farm_seedId){
+                log('种植', `按照用户指定种植${CONFIG.farm_seedId}`);
+                return a;
+            }
+        }
+    }
+
+    log('种植', `没有找到 用户指定种植${CONFIG.farm_seedId}的信息`);
 
     if (CONFIG.forceLowestLevelCrop) {
         available.sort((a, b) => a.requiredLevel - b.requiredLevel || a.price - b.price);
@@ -216,7 +227,7 @@ async function findBestSeed(landsCount) {
 
     try {
         log('商店', `等级: ${state.level}，土地数量: ${landsCount}`);
-        
+
         const rec = getPlantingRecommendation(state.level, landsCount == null ? 18 : landsCount, { top: 50 });
         const rankedSeedIds = rec.candidatesNormalFert.map(x => x.seedId);
         for (const seedId of rankedSeedIds) {
@@ -588,10 +599,10 @@ function onLandsChangedPush(lands) {
     if (isCheckingFarm) return;
     const now = Date.now();
     if (now - lastPushTime < 500) return;  // 500ms 防抖
-    
+
     lastPushTime = now;
     log('农场', `收到推送: ${lands.length}块土地变化，检查中...`);
-    
+
     setTimeout(async () => {
         if (!isCheckingFarm) {
             await checkFarm();
