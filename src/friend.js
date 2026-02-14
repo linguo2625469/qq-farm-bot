@@ -44,6 +44,16 @@ const HELP_ONLY_WITH_EXP = true; // 已更新可用
 // 配置: 是否启用放虫放草功能
 const ENABLE_PUT_BAD_THINGS = false;  // 无效！！！开启后会多次访问朋友导致被拉黑 请勿更改暂时关闭放虫放草功能
 
+// 配置: 启用的操作类型 (如果全部为 false，则不处理任何操作)
+const ENABLED_OPERATIONS = {
+    steal: true,      // 偷菜 (10008)
+    water: false,      // 浇水 (10007)
+    weed: false,       // 除草 (10005)
+    bug: false,        // 除虫 (10006)
+    putWeed: false,   // 放草 (10003)
+    putBug: false,    // 放虫 (10004)
+};
+
 // ============ 好友 API ============
 
 async function getAllFriends() {
@@ -405,7 +415,7 @@ async function visitFriend(friend, totalActions, myGid) {
     const actions = [];
 
     // 帮助操作: 只在有经验时执行 (如果启用了 HELP_ONLY_WITH_EXP)
-    if (status.needWeed.length > 0) {
+    if (ENABLED_OPERATIONS.weed && status.needWeed.length > 0) {
         const shouldHelp = !HELP_ONLY_WITH_EXP || canGetExp(10005);  // 10005=除草
         if (shouldHelp) {
             markExpCheck(10005);
@@ -418,7 +428,7 @@ async function visitFriend(friend, totalActions, myGid) {
         }
     }
 
-    if (status.needBug.length > 0) {
+    if (ENABLED_OPERATIONS.bug && status.needBug.length > 0) {
         const shouldHelp = !HELP_ONLY_WITH_EXP || canGetExp(10006);  // 10006=除虫
         if (shouldHelp) {
             markExpCheck(10006);
@@ -431,7 +441,7 @@ async function visitFriend(friend, totalActions, myGid) {
         }
     }
 
-    if (status.needWater.length > 0) {
+    if (ENABLED_OPERATIONS.water && status.needWater.length > 0) {
         const shouldHelp = !HELP_ONLY_WITH_EXP || canGetExp(10007);  // 10007=浇水
         if (shouldHelp) {
             markExpCheck(10007);
@@ -444,8 +454,8 @@ async function visitFriend(friend, totalActions, myGid) {
         }
     }
 
-    // 偷菜: 始终执行
-    if (status.stealable.length > 0) {
+    // 偷菜: 根据配置决定是否执行
+    if (ENABLED_OPERATIONS.steal && status.stealable.length > 0) {
         let ok = 0;
         const stolenPlants = [];
         for (let i = 0; i < status.stealable.length; i++) {
@@ -467,7 +477,7 @@ async function visitFriend(friend, totalActions, myGid) {
     }
 
     // 捣乱操作: 放虫(10004)/放草(10003)
-    if (ENABLE_PUT_BAD_THINGS && status.canPutBug.length > 0 && canOperate(10004)) {
+    if (ENABLED_OPERATIONS.putBug && ENABLE_PUT_BAD_THINGS && status.canPutBug.length > 0 && canOperate(10004)) {
         let ok = 0;
         const remaining = getRemainingTimes(10004);
         const toProcess = status.canPutBug.slice(0, remaining);
@@ -479,7 +489,7 @@ async function visitFriend(friend, totalActions, myGid) {
         if (ok > 0) { actions.push(`放虫${ok}`); totalActions.putBug += ok; }
     }
 
-    if (ENABLE_PUT_BAD_THINGS && status.canPutWeed.length > 0 && canOperate(10003)) {
+    if (ENABLED_OPERATIONS.putWeed && ENABLE_PUT_BAD_THINGS && status.canPutWeed.length > 0 && canOperate(10003)) {
         let ok = 0;
         const remaining = getRemainingTimes(10003);
         const toProcess = status.canPutWeed.slice(0, remaining);
@@ -518,7 +528,7 @@ async function checkFriends() {
         // 检查帮助经验是否还有
         const canHelpWithExp = !HELP_ONLY_WITH_EXP || canGetExp(10005) || canGetExp(10006) || canGetExp(10007);
         // 检查是否还有捣乱次数 (放虫/放草)
-        const canPutBugOrWeed = canOperate(10004) || canOperate(10003);  // 10004=放虫, 10003=放草
+        const canPutBugOrWeed = (ENABLED_OPERATIONS.putBug && canOperate(10004)) || (ENABLED_OPERATIONS.putWeed && canOperate(10003));  // 10004=放虫, 10003=放草
 
         // 分两类：有预览信息的优先访问，其他的放后面（用于放虫放草）
         const priorityFriends = [];  // 有可偷/可帮助的好友
