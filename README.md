@@ -82,6 +82,24 @@ node client.js --code <code> --interval 5 --friend-interval 2
 | `--verify` | 验证 proto 定义是否正确 | — |
 | `--decode` | 进入 PB 数据解码模式 | — |
 
+### 服务器长期运行（SSH 断开不退出）
+
+服务器上无法扫码，请先在本地用 `--code` 或抓包拿到 code，再在服务器用下面任一方式后台跑。
+
+** tmux / screen（可随时 Attach 看输出）**
+
+```bash
+# tmux
+tmux new -s farm
+node client.js --code <你的code>
+# 按 Ctrl+B 再按 D 脱离，进程继续跑。重连: tmux attach -t farm
+
+# screen
+screen -S farm
+node client.js --code <你的code>
+# 按 Ctrl+A 再按 D 脱离。重连: screen -r farm
+```
+
 ### 邀请码功能（微信环境）
 
 在项目根目录创建 `share.txt` 文件，每行一个邀请链接：
