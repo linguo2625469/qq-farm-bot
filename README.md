@@ -44,7 +44,7 @@ npm install
 
 ## 使用
 
-### 获取登录 Code
+### [获取登录 Code](./GET_CODE.md)
 
 你需要从小程序中抓取 code。可以通过抓包工具（如 Fiddler、Charles、mitmproxy 等）获取 WebSocket 连接 URL 中的 `code` 参数。
 
