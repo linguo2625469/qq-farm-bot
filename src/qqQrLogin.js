@@ -98,4 +98,7 @@ async function getQQFarmCodeByScan(options = {}) {
 
 module.exports = {
     getQQFarmCodeByScan,
+    requestLoginCode,
+    queryScanStatus,
+    getAuthCode,
 };

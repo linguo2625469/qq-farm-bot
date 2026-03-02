@@ -2,6 +2,8 @@
  * 配置常量与枚举定义
  */
 
+const EventEmitter = require('events');
+
 const CONFIG = {
     serverUrl: 'wss://gate-obt.nqf.qq.com/prod/ws',
     clientVersion: '1.6.0.14_20251224',
@@ -17,8 +19,50 @@ const CONFIG = {
         network: 'wifi',
         memory: '7672',
         device_id: 'iPhone X<iPhone18,3>',
-    }
+    },
+
+    // === 主功能开关 ===
+    enableFarmLoop: true,
+    enableFriendLoop: true,
+    enableSellLoop: true,
+    enableTaskSystem: true,
+    enableAutoAcceptFriends: true,
+
+    // === 农场子功能 ===
+    enableAutoHarvest: true,
+    enableAutoWater: true,
+    enableAutoWeed: true,
+    enableAutoBug: true,
+    enableAutoFertilize: true,
+    enableAutoPlant: true,
+    enableAutoRemoveDead: true,
+
+    // === 好友子功能 ===
+    enableHelpWater: true,
+    enableHelpWeed: true,
+    enableHelpBug: true,
+    enableSteal: true,
+    helpOnlyWithExp: true,
+    enablePutInsects: false,
+    enablePutWeeds: false,
 };
+
+// 配置变更事件
+const configEvents = new EventEmitter();
+
+/**
+ * 更新配置项并触发变更事件
+ * @param {string} key - 配置键名
+ * @param {*} value - 新值
+ */
+function updateConfig(key, value) {
+    if (!(key in CONFIG)) return false;
+    const oldValue = CONFIG[key];
+    if (oldValue === value) return true;
+    CONFIG[key] = value;
+    configEvents.emit('change', { key, value, oldValue });
+    return true;
+}
 
 // 运行期提示文案（做了简单编码，避免明文散落）
 const RUNTIME_HINT_MASK = 23;
@@ -48,4 +92,6 @@ module.exports = {
     PHASE_NAMES,
     RUNTIME_HINT_MASK,
     RUNTIME_HINT_DATA,
+    configEvents,
+    updateConfig,
 };

@@ -7,10 +7,12 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "gui": "node gui.js"
   },
   "dependencies": {
     "axios": "^1.13.5",
+    "express": "^4.22.1",
     "long": "^5.3.2",
     "protobufjs": "^8.0.0",
     "qrcode-terminal": "^0.12.0",
