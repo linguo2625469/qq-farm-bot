@@ -38,11 +38,9 @@ const OP_NAMES = {
     10008: '偷菜',
 };
 
-// 配置: 是否只在有经验时才帮助好友  
-const HELP_ONLY_WITH_EXP = true; // 已更新可用
-
-// 配置: 是否启用放虫放草功能
-const ENABLE_PUT_BAD_THINGS = false;  // 无效！！！开启后会多次访问朋友导致被拉黑 请勿更改暂时关闭放虫放草功能
+// 注意: 帮助/捣乱开关现在由 CONFIG 控制
+// CONFIG.helpOnlyWithExp (默认 true)
+// CONFIG.enablePutInsects / CONFIG.enablePutWeeds (默认 false)
 
 // ============ 好友 API ============
 
@@ -404,9 +402,9 @@ async function visitFriend(friend, totalActions, myGid) {
     // 执行操作
     const actions = [];
 
-    // 帮助操作: 只在有经验时执行 (如果启用了 HELP_ONLY_WITH_EXP)
-    if (status.needWeed.length > 0) {
-        const shouldHelp = !HELP_ONLY_WITH_EXP || canGetExp(10005);  // 10005=除草
+    // 帮助操作: 只在有经验时执行 (如果启用了 CONFIG.helpOnlyWithExp)
+    if (status.needWeed.length > 0 && CONFIG.enableHelpWeed) {
+        const shouldHelp = !CONFIG.helpOnlyWithExp || canGetExp(10005);  // 10005=除草
         if (shouldHelp) {
             markExpCheck(10005);
             let ok = 0;
@@ -418,8 +416,8 @@ async function visitFriend(friend, totalActions, myGid) {
         }
     }
 
-    if (status.needBug.length > 0) {
-        const shouldHelp = !HELP_ONLY_WITH_EXP || canGetExp(10006);  // 10006=除虫
+    if (status.needBug.length > 0 && CONFIG.enableHelpBug) {
+        const shouldHelp = !CONFIG.helpOnlyWithExp || canGetExp(10006);  // 10006=除虫
         if (shouldHelp) {
             markExpCheck(10006);
             let ok = 0;
@@ -431,8 +429,8 @@ async function visitFriend(friend, totalActions, myGid) {
         }
     }
 
-    if (status.needWater.length > 0) {
-        const shouldHelp = !HELP_ONLY_WITH_EXP || canGetExp(10007);  // 10007=浇水
+    if (status.needWater.length > 0 && CONFIG.enableHelpWater) {
+        const shouldHelp = !CONFIG.helpOnlyWithExp || canGetExp(10007);  // 10007=浇水
         if (shouldHelp) {
             markExpCheck(10007);
             let ok = 0;
@@ -444,8 +442,8 @@ async function visitFriend(friend, totalActions, myGid) {
         }
     }
 
-    // 偷菜: 始终执行
-    if (status.stealable.length > 0) {
+    // 偷菜
+    if (status.stealable.length > 0 && CONFIG.enableSteal) {
         let ok = 0;
         const stolenPlants = [];
         for (let i = 0; i < status.stealable.length; i++) {
@@ -467,7 +465,7 @@ async function visitFriend(friend, totalActions, myGid) {
     }
 
     // 捣乱操作: 放虫(10004)/放草(10003)
-    if (ENABLE_PUT_BAD_THINGS && status.canPutBug.length > 0 && canOperate(10004)) {
+    if (CONFIG.enablePutInsects && status.canPutBug.length > 0 && canOperate(10004)) {
         let ok = 0;
         const remaining = getRemainingTimes(10004);
         const toProcess = status.canPutBug.slice(0, remaining);
@@ -479,7 +477,7 @@ async function visitFriend(friend, totalActions, myGid) {
         if (ok > 0) { actions.push(`放虫${ok}`); totalActions.putBug += ok; }
     }
 
-    if (ENABLE_PUT_BAD_THINGS && status.canPutWeed.length > 0 && canOperate(10003)) {
+    if (CONFIG.enablePutWeeds && status.canPutWeed.length > 0 && canOperate(10003)) {
         let ok = 0;
         const remaining = getRemainingTimes(10003);
         const toProcess = status.canPutWeed.slice(0, remaining);
@@ -516,7 +514,7 @@ async function checkFriends() {
         if (friends.length === 0) { log('好友', '没有好友'); return; }
 
         // 检查帮助经验是否还有
-        const canHelpWithExp = !HELP_ONLY_WITH_EXP || canGetExp(10005) || canGetExp(10006) || canGetExp(10007);
+        const canHelpWithExp = !CONFIG.helpOnlyWithExp || canGetExp(10005) || canGetExp(10006) || canGetExp(10007);
         // 检查是否还有捣乱次数 (放虫/放草)
         const canPutBugOrWeed = canOperate(10004) || canOperate(10003);  // 10004=放虫, 10003=放草
 
@@ -554,7 +552,7 @@ async function checkFriends() {
                 // 只有帮助项且还能获得经验时才加入
                 priorityFriends.push({ gid, name, level: toNum(f.level), hasSteal: false, hasHelp: true });
                 visitedGids.add(gid);
-            } else if (ENABLE_PUT_BAD_THINGS && canPutBugOrWeed) {
+            } else if ((CONFIG.enablePutInsects || CONFIG.enablePutWeeds) && canPutBugOrWeed) {
                 // 没有预览信息但可以放虫放草（仅在开启放虫放草功能时）
                 otherFriends.push({ gid, name, level: toNum(f.level), hasSteal: false, hasHelp: false });
                 visitedGids.add(gid);
@@ -667,6 +665,8 @@ function stopFriendCheckLoop() {
 function onFriendApplicationReceived(applications) {
     const names = applications.map(a => a.name || `GID:${toNum(a.gid)}`).join(', ');
     log('申请', `收到 ${applications.length} 个好友申请: ${names}`);
+
+    if (!CONFIG.enableAutoAcceptFriends) return;
 
     // 自动同意
     const gids = applications.map(a => toNum(a.gid));

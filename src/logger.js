@@ -14,6 +14,22 @@ let currentDateKey = '';
 let stream = null;
 let disabled = false;
 
+// 日志订阅机制 (供 GUI SSE 使用)
+const logSubscribers = new Set();
+
+function addLogSubscriber(fn) { logSubscribers.add(fn); }
+function removeLogSubscriber(fn) { logSubscribers.delete(fn); }
+
+function broadcastLog(level, args) {
+    if (logSubscribers.size === 0) return;
+    const util = require('util');
+    const message = util.formatWithOptions({ colors: false, depth: null }, ...args);
+    const entry = { time: Date.now(), level, message };
+    for (const fn of logSubscribers) {
+        try { fn(entry); } catch (_) {}
+    }
+}
+
 function pad2(n) {
     return String(n).padStart(2, '0');
 }
@@ -70,16 +86,19 @@ function initFileLogger() {
     console.log = (...args) => {
         rawLog(...args);
         appendLine('INFO', args);
+        broadcastLog('INFO', args);
     };
 
     console.warn = (...args) => {
         rawWarn(...args);
         appendLine('WARN', args);
+        broadcastLog('WARN', args);
     };
 
     console.error = (...args) => {
         rawError(...args);
         appendLine('ERROR', args);
+        broadcastLog('ERROR', args);
     };
 
     process.on('exit', () => {
@@ -92,4 +111,6 @@ function initFileLogger() {
 
 module.exports = {
     initFileLogger,
+    addLogSubscriber,
+    removeLogSubscriber,
 };

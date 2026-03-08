@@ -316,7 +316,7 @@ async function autoPlantEmptyLands(deadLandIds, emptyLandIds, unlockedLandCount)
     }
 
     // 5. 施肥（逐块拖动，间隔50ms）
-    if (plantedLands.length > 0) {
+    if (plantedLands.length > 0 && CONFIG.enableAutoFertilize) {
         const fertilized = await fertilize(plantedLands);
         if (fertilized > 0) {
             log('施肥', `已为 ${fertilized}/${plantedLands.length} 块地施肥`);
@@ -513,13 +513,13 @@ async function checkFarm() {
 
         // 一键操作：除草、除虫、浇水可以并行执行（游戏中都是一键完成）
         const batchOps = [];
-        if (status.needWeed.length > 0) {
+        if (status.needWeed.length > 0 && CONFIG.enableAutoWeed) {
             batchOps.push(weedOut(status.needWeed).then(() => actions.push(`除草${status.needWeed.length}`)).catch(e => logWarn('除草', e.message)));
         }
-        if (status.needBug.length > 0) {
+        if (status.needBug.length > 0 && CONFIG.enableAutoBug) {
             batchOps.push(insecticide(status.needBug).then(() => actions.push(`除虫${status.needBug.length}`)).catch(e => logWarn('除虫', e.message)));
         }
-        if (status.needWater.length > 0) {
+        if (status.needWater.length > 0 && CONFIG.enableAutoWater) {
             batchOps.push(waterLand(status.needWater).then(() => actions.push(`浇水${status.needWater.length}`)).catch(e => logWarn('浇水', e.message)));
         }
         if (batchOps.length > 0) {
@@ -528,7 +528,7 @@ async function checkFarm() {
 
         // 收获（一键操作）
         let harvestedLandIds = [];
-        if (status.harvestable.length > 0) {
+        if (status.harvestable.length > 0 && CONFIG.enableAutoHarvest) {
             try {
                 await harvest(status.harvestable);
                 actions.push(`收获${status.harvestable.length}`);
@@ -560,10 +560,13 @@ async function checkFarm() {
             }
         }
 
-        if (allDeadLands.length > 0 || allEmptyLands.length > 0) {
+        // 根据开关过滤：铲除枯死 + 种植
+        const finalDeadLands = CONFIG.enableAutoRemoveDead ? allDeadLands : [];
+        const finalEmptyLands = CONFIG.enableAutoPlant ? allEmptyLands : [];
+        if (finalDeadLands.length > 0 || finalEmptyLands.length > 0) {
             try {
-                await autoPlantEmptyLands(allDeadLands, allEmptyLands, unlockedLandCount);
-                actions.push(`种植${allDeadLands.length + allEmptyLands.length}`);
+                await autoPlantEmptyLands(finalDeadLands, finalEmptyLands, unlockedLandCount);
+                actions.push(`种植${finalDeadLands.length + finalEmptyLands.length}`);
             } catch (e) { logWarn('种植', e.message); }
         }
 

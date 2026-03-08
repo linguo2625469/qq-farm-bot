@@ -443,12 +443,21 @@ function connect(code, onLoginSuccess) {
 function cleanup() {
     if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
     pendingCallbacks.clear();
+    clientSeq = 1;
+    serverSeq = 0;
+}
+
+function closeWs() {
+    if (ws) {
+        try { ws.close(); } catch (_) {}
+        ws = null;
+    }
 }
 
 function getWs() { return ws; }
 
 module.exports = {
-    connect, cleanup, getWs,
+    connect, cleanup, closeWs, getWs,
     sendMsg, sendMsgAsync,
     getUserState,
     networkEvents,

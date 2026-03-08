@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QQ Farm Bot - Control Panel</title>
+<style>
+:root {
+    --bg: #0f0f0f;
+    --card: #1a1a2e;
+    --card-border: #252545;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --accent: #4ecdc4;
+    --accent2: #45b7aa;
+    --danger: #e74c3c;
+    --danger2: #c0392b;
+    --warn: #f39c12;
+    --success: #2ecc71;
+    --toggle-off: #444;
+    --toggle-on: #4ecdc4;
+    --input-bg: #252545;
+    --log-bg: #0a0a1a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+.header h1 {
+    font-size: 1.5rem;
+    color: var(--accent);
+    font-weight: 600;
+}
+.header p { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; }
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+}
+.card h2 {
+    font-size: 0.95rem;
+    color: var(--accent);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--card-border);
+}
+.card.danger h2 { color: var(--danger); }
+
+/* Status */
+.status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.stat { padding: 8px 12px; background: var(--input-bg); border-radius: 8px; }
+.stat-label { font-size: 0.75rem; color: var(--text-dim); }
+.stat-value { font-size: 1.1rem; font-weight: 600; margin-top: 2px; }
+.stat-value.running { color: var(--success); }
+.stat-value.stopped { color: var(--danger); }
+
+/* Login */
+.login-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+.login-row input, .login-row select {
+    background: var(--input-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+}
+.login-row input:focus, .login-row select:focus {
+    border-color: var(--accent);
+}
+.login-row input { flex: 1; }
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-accent { background: var(--accent); color: #000; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-secondary { background: var(--toggle-off); color: var(--text); }
+.btn-row { display: flex; gap: 8px; }
+#qr-area { text-align: center; margin-top: 12px; display: none; }
+#qr-area img { max-width: 200px; border-radius: 8px; background: #fff; padding: 8px; }
+#qr-status { margin-top: 8px; color: var(--text-dim); font-size: 0.85rem; }
+
+/* Toggle */
+.toggle-group { display: flex; flex-direction: column; gap: 10px; }
+.toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+}
+.toggle-label { font-size: 0.9rem; }
+.toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+}
+.toggle input { display: none; }
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--toggle-off);
+    border-radius: 24px;
+    transition: background 0.3s;
+}
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+.toggle input:checked + .toggle-slider {
+    background: var(--toggle-on);
+}
+.toggle input:checked + .toggle-slider::after {
+    transform: translateX(20px);
+}
+.card.danger .toggle input:checked + .toggle-slider {
+    background: var(--danger);
+}
+
+/* Slider */
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+.slider-row label { font-size: 0.9rem; flex-shrink: 0; }
+.slider-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 6px;
+}
+.slider-val {
+    font-size: 0.85rem;
+    color: var(--accent);
+    min-width: 40px;
+    text-align: right;
+    font-weight: 600;
+}
+
+/* Log */
+.log-panel {
+    grid-column: 1 / -1;
+}
+#log-box {
+    background: var(--log-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px;
+    height: 360px;
+    overflow-y: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line.WARN { color: var(--warn); }
+.log-line.ERROR { color: var(--danger); }
+.log-line.INFO { color: var(--text-dim); }
+
+/* Confirm dialog */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+.overlay.hidden { display: none; }
+.dialog {
+    background: var(--card);
+    border: 1px solid var(--danger);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 360px;
+    text-align: center;
+}
+.dialog h3 { color: var(--danger); margin-bottom: 12px; }
+.dialog p { color: var(--text-dim); margin-bottom: 20px; font-size: 0.9rem; }
+.dialog .btn-row { justify-content: center; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>QQ Farm Bot</h1>
+    <p>Web Control Panel</p>
+</div>
+
+<div class="grid">
+
+<!-- Status Card -->
+<div class="card">
+    <h2>Bot Status</h2>
+    <div class="status-grid">
+        <div class="stat">
+            <div class="stat-label">Status</div>
+            <div class="stat-value" id="s-state">stopped</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Platform</div>
+            <div class="stat-value" id="s-platform">-</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Nickname</div>
+            <div class="stat-value" id="s-name">-</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Level</div>
+            <div class="stat-value" id="s-level">-</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Gold</div>
+            <div class="stat-value" id="s-gold">-</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">EXP</div>
+            <div class="stat-value" id="s-exp">-</div>
+        </div>
+    </div>
+</div>
+
+<!-- Login Card -->
+<div class="card">
+    <h2>Login & Control</h2>
+    <div class="login-row">
+        <input type="text" id="code-input" placeholder="Login code...">
+        <select id="platform-select">
+            <option value="qq">QQ</option>
+            <option value="wx">WeChat</option>
+        </select>
+    </div>
+    <div class="btn-row">
+        <button class="btn btn-accent" id="btn-start" onclick="doStart()">Start Bot</button>
+        <button class="btn btn-danger" id="btn-stop" onclick="doStop()" disabled>Stop Bot</button>
+        <button class="btn btn-secondary" id="btn-qr" onclick="doQrLogin()">QR Login</button>
+    </div>
+    <div id="qr-area">
+        <img id="qr-img" src="" alt="QR Code">
+        <div id="qr-status">Waiting for scan...</div>
+    </div>
+</div>
+
+<!-- Farm Toggles -->
+<div class="card">
+    <h2>Farm</h2>
+    <div class="toggle-group">
+        <div class="toggle-row">
+            <span class="toggle-label">Farm Loop</span>
+            <label class="toggle"><input type="checkbox" data-key="enableFarmLoop" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Harvest</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoHarvest" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Water</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoWater" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Weed</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoWeed" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Bug</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoBug" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Fertilize</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoFertilize" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Plant</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoPlant" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Remove Dead Plants</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoRemoveDead" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+    </div>
+</div>
+
+<!-- Friend Toggles -->
+<div class="card">
+    <h2>Friends</h2>
+    <div class="toggle-group">
+        <div class="toggle-row">
+            <span class="toggle-label">Friend Loop</span>
+            <label class="toggle"><input type="checkbox" data-key="enableFriendLoop" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Help Water</span>
+            <label class="toggle"><input type="checkbox" data-key="enableHelpWater" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Help Weed</span>
+            <label class="toggle"><input type="checkbox" data-key="enableHelpWeed" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Help Bug</span>
+            <label class="toggle"><input type="checkbox" data-key="enableHelpBug" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Steal Crops</span>
+            <label class="toggle"><input type="checkbox" data-key="enableSteal" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+    </div>
+</div>
+
+<!-- General Toggles -->
+<div class="card">
+    <h2>General</h2>
+    <div class="toggle-group">
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Sell</span>
+            <label class="toggle"><input type="checkbox" data-key="enableSellLoop" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Tasks</span>
+            <label class="toggle"><input type="checkbox" data-key="enableTaskSystem" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Auto Accept Friends</span>
+            <label class="toggle"><input type="checkbox" data-key="enableAutoAcceptFriends" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Force Lowest Crop</span>
+            <label class="toggle"><input type="checkbox" data-key="forceLowestLevelCrop" onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Help Only w/ EXP</span>
+            <label class="toggle"><input type="checkbox" data-key="helpOnlyWithExp" checked onchange="toggleConfig(this)"><span class="toggle-slider"></span></label>
+        </div>
+    </div>
+</div>
+
+<!-- Danger Toggles -->
+<div class="card danger">
+    <h2>Danger Zone</h2>
+    <div class="toggle-group">
+        <div class="toggle-row">
+            <span class="toggle-label">Put Insects (on friends)</span>
+            <label class="toggle"><input type="checkbox" data-key="enablePutInsects" onchange="confirmDanger(this)"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">Put Weeds (on friends)</span>
+            <label class="toggle"><input type="checkbox" data-key="enablePutWeeds" onchange="confirmDanger(this)"><span class="toggle-slider"></span></label>
+        </div>
+    </div>
+</div>
+
+<!-- Intervals -->
+<div class="card">
+    <h2>Intervals</h2>
+    <div class="toggle-group">
+        <div class="slider-row">
+            <label>Farm Check</label>
+            <input type="range" min="1" max="60" value="1" id="slider-farm" oninput="updateSlider('farmCheckInterval', this)">
+            <span class="slider-val" id="val-farm">1s</span>
+        </div>
+        <div class="slider-row">
+            <label>Friend Check</label>
+            <input type="range" min="1" max="120" value="10" id="slider-friend" oninput="updateSlider('friendCheckInterval', this)">
+            <span class="slider-val" id="val-friend">10s</span>
+        </div>
+    </div>
+</div>
+
+<!-- Log Panel -->
+<div class="card log-panel">
+    <h2>Live Logs</h2>
+    <div id="log-box"></div>
+</div>
+
+</div>
+
+<!-- Confirm Dialog -->
+<div class="overlay hidden" id="confirm-dialog">
+    <div class="dialog">
+        <h3>Warning</h3>
+        <p id="confirm-msg">This may cause your account to be blocked by friends. Are you sure?</p>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="cancelDanger()">Cancel</button>
+            <button class="btn btn-danger" onclick="confirmDangerOk()">Enable</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const MAX_LOG_LINES = 500;
+const logBox = document.getElementById('log-box');
+let evtSource = null;
+let qrPollTimer = null;
+let pendingDangerEl = null;
+
+// --- Status polling ---
+async function refreshStatus() {
+    try {
+        const r = await fetch('/api/status');
+        const d = await r.json();
+        const el = id => document.getElementById(id);
+        const stateEl = el('s-state');
+        stateEl.textContent = d.botState;
+        stateEl.className = 'stat-value ' + (d.botState === 'running' ? 'running' : 'stopped');
+        el('s-platform').textContent = d.platform || '-';
+        el('s-name').textContent = d.name || '-';
+        el('s-level').textContent = d.level || '-';
+        el('s-gold').textContent = d.gold != null ? d.gold.toLocaleString() : '-';
+        el('s-exp').textContent = d.exp != null ? d.exp.toLocaleString() : '-';
+
+        const running = d.botState === 'running';
+        document.getElementById('btn-start').disabled = running;
+        document.getElementById('btn-stop').disabled = !running;
+    } catch (_) {}
+}
+
+async function refreshConfig() {
+    try {
+        const r = await fetch('/api/config');
+        const cfg = await r.json();
+        document.querySelectorAll('[data-key]').forEach(input => {
+            const key = input.dataset.key;
+            if (key in cfg) input.checked = !!cfg[key];
+        });
+        if ('farmCheckInterval' in cfg) {
+            const sec = Math.round(cfg.farmCheckInterval / 1000);
+            document.getElementById('slider-farm').value = sec;
+            document.getElementById('val-farm').textContent = sec + 's';
+        }
+        if ('friendCheckInterval' in cfg) {
+            const sec = Math.round(cfg.friendCheckInterval / 1000);
+            document.getElementById('slider-friend').value = sec;
+            document.getElementById('val-friend').textContent = sec + 's';
+        }
+    } catch (_) {}
+}
+
+// --- Toggle handler ---
+async function toggleConfig(el) {
+    const key = el.dataset.key;
+    const value = el.checked;
+    try {
+        await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value }),
+        });
+    } catch (_) {
+        el.checked = !value; // revert on error
+    }
+}
+
+// --- Slider handler ---
+let sliderTimeout = null;
+function updateSlider(key, el) {
+    const sec = parseInt(el.value);
+    const valId = key === 'farmCheckInterval' ? 'val-farm' : 'val-friend';
+    document.getElementById(valId).textContent = sec + 's';
+    clearTimeout(sliderTimeout);
+    sliderTimeout = setTimeout(() => {
+        fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value: sec * 1000 }),
+        });
+    }, 300);
+}
+
+// --- Danger confirm ---
+function confirmDanger(el) {
+    if (el.checked) {
+        el.checked = false;
+        pendingDangerEl = el;
+        document.getElementById('confirm-dialog').classList.remove('hidden');
+    } else {
+        toggleConfig(el);
+    }
+}
+function cancelDanger() {
+    pendingDangerEl = null;
+    document.getElementById('confirm-dialog').classList.add('hidden');
+}
+function confirmDangerOk() {
+    document.getElementById('confirm-dialog').classList.add('hidden');
+    if (pendingDangerEl) {
+        pendingDangerEl.checked = true;
+        toggleConfig(pendingDangerEl);
+        pendingDangerEl = null;
+    }
+}
+
+// --- Bot start/stop ---
+async function doStart() {
+    const code = document.getElementById('code-input').value.trim();
+    const platform = document.getElementById('platform-select').value;
+    if (!code) return alert('Please enter login code or use QR login');
+    document.getElementById('btn-start').disabled = true;
+    try {
+        const r = await fetch('/api/bot/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, platform }),
+        });
+        const d = await r.json();
+        if (!r.ok) alert('Start failed: ' + (d.error || 'Unknown error'));
+    } catch (e) {
+        alert('Start failed: ' + e.message);
+    }
+    refreshStatus();
+}
+
+async function doStop() {
+    document.getElementById('btn-stop').disabled = true;
+    try {
+        await fetch('/api/bot/stop', { method: 'POST' });
+    } catch (_) {}
+    refreshStatus();
+}
+
+// --- QR Login ---
+async function doQrLogin() {
+    const qrArea = document.getElementById('qr-area');
+    const qrImg = document.getElementById('qr-img');
+    const qrStatus = document.getElementById('qr-status');
+
+    document.getElementById('btn-qr').disabled = true;
+    qrStatus.textContent = 'Getting QR code...';
+    qrArea.style.display = 'block';
+
+    try {
+        const r = await fetch('/api/qr/start');
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+
+        qrImg.src = d.qrImageUrl;
+        qrStatus.textContent = 'Scan QR code with QQ app';
+
+        // Start polling
+        let loginCode = d.loginCode;
+        if (qrPollTimer) clearInterval(qrPollTimer);
+        qrPollTimer = setInterval(async () => {
+            try {
+                const pr = await fetch('/api/qr/poll?loginCode=' + encodeURIComponent(loginCode));
+                const pd = await pr.json();
+                if (pd.status === 'OK' && pd.code) {
+                    clearInterval(qrPollTimer);
+                    qrPollTimer = null;
+                    qrStatus.textContent = 'Login successful! Starting bot...';
+                    document.getElementById('code-input').value = pd.code;
+                    qrArea.style.display = 'none';
+                    document.getElementById('btn-qr').disabled = false;
+                    // Auto start
+                    doStart();
+                } else if (pd.status === 'Used') {
+                    clearInterval(qrPollTimer);
+                    qrPollTimer = null;
+                    qrStatus.textContent = 'QR expired, please try again';
+                    document.getElementById('btn-qr').disabled = false;
+                }
+            } catch (_) {}
+        }, 2000);
+    } catch (e) {
+        qrStatus.textContent = 'Failed: ' + e.message;
+        document.getElementById('btn-qr').disabled = false;
+    }
+}
+
+// --- SSE Logs ---
+function connectLogs() {
+    if (evtSource) evtSource.close();
+    evtSource = new EventSource('/api/logs/stream');
+    evtSource.onmessage = (e) => {
+        try {
+            const entry = JSON.parse(e.data);
+            const time = new Date(entry.time).toLocaleTimeString();
+            const line = document.createElement('div');
+            line.className = 'log-line ' + entry.level;
+            line.textContent = `[${time}] [${entry.level}] ${entry.message}`;
+            logBox.appendChild(line);
+            // Limit lines
+            while (logBox.children.length > MAX_LOG_LINES) {
+                logBox.removeChild(logBox.firstChild);
+            }
+            // Auto scroll
+            logBox.scrollTop = logBox.scrollHeight;
+        } catch (_) {}
+    };
+    evtSource.onerror = () => {
+        evtSource.close();
+        setTimeout(connectLogs, 3000);
+    };
+}
+
+// --- Init ---
+refreshStatus();
+refreshConfig();
+connectLogs();
+setInterval(refreshStatus, 3000);
+</script>
+</body>
+</html>
