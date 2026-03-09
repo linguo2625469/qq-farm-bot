@@ -316,7 +316,7 @@ async function autoPlantEmptyLands(deadLandIds, emptyLandIds, unlockedLandCount)
     }
 
     // 5. 施肥（逐块拖动，间隔50ms）
-    if (plantedLands.length > 0) {
+    if (CONFIG.enableFertilize && plantedLands.length > 0) {
         const fertilized = await fertilize(plantedLands);
         if (fertilized > 0) {
             log('施肥', `已为 ${fertilized}/${plantedLands.length} 块地施肥`);

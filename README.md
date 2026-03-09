@@ -86,6 +86,13 @@ node client.js --code <你的登录code> --wx
 node client.js --code <code> --interval 5 --friend-interval 2
 ```
 
+### 禁用自动施肥
+
+```bash
+# 启动时不自动施肥
+node client.js --code <code> --no-fertilize
+```
+
 ### 参数说明
 
 | 参数 | 说明 | 默认值 |
@@ -94,6 +101,7 @@ node client.js --code <code> --interval 5 --friend-interval 2
 | `--wx` | 使用微信登录 | QQ 小程序 |
 | `--interval` | 自己农场巡查间隔（秒） | 2 |
 | `--friend-interval` | 好友巡查间隔（秒） | 1 |
+| `--no-fertilize` | 不自动施肥 | 自动施肥 |
 | `--verify` | 验证 proto 定义是否正确 | — |
 | `--decode` | 进入 PB 数据解码模式 | — |
 
@@ -237,6 +245,7 @@ const CONFIG = {
     heartbeatInterval: 25000,    // 心跳间隔 25秒
     farmCheckInterval: 1000,     // 农场巡查完成后等待间隔
     friendCheckInterval: 10000,  // 好友巡查完成后等待间隔
+    enableFertilize: true,       // 是否自动施肥 (可通过 --no-fertilize 关闭)
     forceLowestLevelCrop: false, // true: 固定最低等级作物（白萝卜优先），跳过经验效率分析
 };
 ```

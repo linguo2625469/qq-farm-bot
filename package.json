@@ -13,6 +13,7 @@
     "axios": "^1.13.5",
     "long": "^5.3.2",
     "protobufjs": "^8.0.0",
+    "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "ws": "^8.19.0"
   }

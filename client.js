@@ -45,6 +45,7 @@ QQ经典农场 挂机脚本
   --wx                使用微信登录 (默认为QQ小程序)
   --interval          自己农场巡查完成后等待秒数, 默认10秒, 最低10秒
   --friend-interval   好友巡查完成后等待秒数, 默认1秒, 最低1秒
+  --no-fertilize      不自动施肥 (默认自动施肥)
   --verify            验证proto定义
   --decode            解码PB数据 (运行 --decode 无参数查看详细帮助)
 
@@ -64,36 +65,70 @@ QQ经典农场 挂机脚本
 `);
 }
 
-// ============ 参数解析 ============
-function parseArgs(args) {
-    const options = {
-        code: '',
-        qrLogin: false,
-        deleteAccountMode: false,
-        name: '',
-        certId: '',
-        certType: 0,
-    };
+function getArgsMap(args) {
+    const map = new Map();
 
     for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--code' && args[i + 1]) {
-            options.code = args[++i];
+        const key = args[i];
+        if (!key.startsWith('--')) {
+            map.set(key, true);
+            continue;
         }
-        if (args[i] === '--qr') {
-            options.qrLogin = true;
-        }
-        if (args[i] === '--wx') {
-            CONFIG.platform = 'wx';
-        }
-        if (args[i] === '--interval' && args[i + 1]) {
-            const sec = parseInt(args[++i]);
-            CONFIG.farmCheckInterval = Math.max(sec, 1) * 1000;
-        }
-        if (args[i] === '--friend-interval' && args[i + 1]) {
-            const sec = parseInt(args[++i]);
-            CONFIG.friendCheckInterval = Math.max(sec, 1) * 1000;  // 最低1秒
+
+        // 检查是否有下一个参数，且下一个参数不是另一个配置项
+        const nextValue = args[i + 1];
+        if (nextValue !== undefined && !nextValue.startsWith('--')) {
+            map.set(key, nextValue);
+            i++; // 跳过下一个参数
+        } else {
+            // 这是一个布尔开关
+            map.set(key, true);
         }
     }
+
+    return map;
+}
+
+function parseArgs(argsMap) {
+    const options = {
+        code: process.env.CODE || '',
+        qrLogin: false
+    };
+
+    let interval = parseInt(process.env.INTERVAL) || 0;
+    let friend_interval = parseInt(process.env.FRIEND_INTERVAL) || 0;
+
+    for (const [key, value] of argsMap) {
+        switch (key) {
+            case '--code':
+                options.code = value;
+                break;
+            case '--qr':
+                options.qrLogin = value;
+                break;
+            case '--wx':
+                CONFIG.platform = 'wx';
+                break;
+            case '--interval':
+                interval = parseInt(value);
+                break;
+            case '--friend-interval':
+                friend_interval = parseInt(value);
+                break;
+            case '--no-fertilize':
+                CONFIG.enableFertilize = false;
+                break;
+        }
+    }
+
+    if (interval) {
+        CONFIG.farmCheckInterval = Math.max(interval, 1) * 1000;
+    }
+
+    if (friend_interval) {
+        CONFIG.friendCheckInterval = Math.max(friend_interval, 1) * 1000;
+    }
+
     return options;
 }
 
@@ -118,7 +153,8 @@ async function main() {
     }
 
     // 正常挂机模式
-    const options = parseArgs(args);
+    const argsMap = getArgsMap(args);
+    const options = parseArgs(argsMap);
 
     // QQ 平台支持扫码登录: 显式 --qr，或未传 --code 时自动触发
     if (!options.code && CONFIG.platform === 'qq' && (options.qrLogin || !args.includes('--code'))) {
